@@ -43,7 +43,39 @@ server or static host.
 | `/aipip`                 | AI Powered Invoice Processing overview                           |
 | `/aipip/simulator`       | AIPIP business case simulator                                    |
 
-## Deployment note
+## Deploying to GitHub Pages
+
+`.github/workflows/deploy-pages.yml` builds and publishes the site on every
+push to `main`, and can also be started manually from the Actions tab.
+
+One-time setup in the repository: **Settings → Pages → Build and deployment →
+Source: GitHub Actions**. The site is then served at
+`https://<owner>.github.io/<repo>/`. Note that Pages for a *private*
+repository requires a paid GitHub plan; on the free plan the repository has
+to be public.
+
+Two details make a project site work, both already wired up:
+
+- **Sub-path** — a project site lives under `/<repo>/`, not at the domain
+  root. The workflow passes `BASE_PATH` (from `actions/configure-pages`) into
+  the build, which sets Vite's `base`; the router picks the same value up via
+  `import.meta.env.BASE_URL` as its `basename`. With a custom domain
+  `base_path` is empty and the site builds for the root instead — no change
+  needed.
+- **Deep links** — Pages has no rewrite rules, so `npm run build` also writes
+  `dist/404.html` (see `scripts/spa-fallback.mjs`). Pages answers unknown
+  paths like `/demo/benchmarking` with it, and react-router resolves the route
+  client-side. The HTTP status of such a first request is 404 while the page
+  renders normally — that is inherent to the 404.html approach, not a bug.
+
+To reproduce a Pages build locally:
+
+```bash
+BASE_PATH=/Business-Case-Tool npm run build
+npx vite preview --base /Business-Case-Tool/
+```
+
+## Deploying elsewhere
 
 This is a client-side routed SPA, so the host must serve `index.html` for
 every path — otherwise a direct hit on e.g. `/demo/benchmarking` returns 404.
@@ -52,7 +84,6 @@ every path — otherwise a direct hit on e.g. `/demo/benchmarking` returns 404.
 - **Vercel** — `{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }` in `vercel.json`
 - **nginx** — `try_files $uri $uri/ /index.html;`
 - **Apache** — `FallbackResource /index.html`
-- **GitHub Pages** — copy `dist/index.html` to `dist/404.html`
 
 ## Project structure
 
@@ -68,6 +99,8 @@ src/
     context/            shared app state
     data/, utils/       mock data, formatting and formula helpers
   imports/              images exported from Figma
+scripts/
+  spa-fallback.mjs      writes dist/404.html after the build
 ```
 
 State is held in React context and persisted to `localStorage`; there is no

@@ -16,7 +16,17 @@ function figmaAssetResolver() {
   }
 }
 
+// Sub-path the site is served from. Defaults to the domain root; GitHub Pages
+// serves project sites from /<repo>/, so the deploy workflow passes BASE_PATH.
+// Vite requires a leading and trailing slash.
+function normalizeBase(value) {
+  if (!value || value === '/') return '/'
+  return `/${value.replace(/^\/+|\/+$/g, '')}/`
+}
+
 export default defineConfig({
+  base: normalizeBase(process.env.BASE_PATH),
+
   plugins: [
     figmaAssetResolver(),
     // The React and Tailwind plugins are both required for Make, even if
