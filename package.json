@@ -6,7 +6,9 @@
   "scripts": {
     "build": "vite build && node scripts/spa-fallback.mjs",
     "dev": "vite",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "serve": "node scripts/serve.mjs",
+    "start": "npm run build && node scripts/serve.mjs"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",

@@ -12,22 +12,62 @@ drivers, NPV/ROI/TCO simulation).
 - Node.js 20 or newer
 - npm (a `package-lock.json` is committed for reproducible installs)
 
-## Running the site
+## Development
 
 ```bash
 npm install     # install dependencies
 npm run dev     # dev server with hot reload, http://localhost:5173
 ```
 
+To just run the finished site rather than work on it, see
+[Hosting it locally](#hosting-it-locally).
+
+## Hosting it locally
+
+`npm start` builds the site and serves it — this is the way to run it on your
+own machine or an internal server, with no cloud deployment involved:
+
+```bash
+npm install
+npm start                        # http://localhost:4173
+```
+
+Once a build exists, `npm run serve` starts the server without rebuilding.
+After changing the code, run `npm run build` again (or just `npm start`).
+
+```bash
+npm run serve                      # serve the existing build
+npm run serve -- --port 8080       # different port
+npm run serve -- --host            # also reachable on the local network
+```
+
+`--host` binds to all interfaces and prints the network URL, so colleagues on
+the same network can open the tool. Without it the server listens on localhost
+only and nobody else can reach it. There is no authentication built in, so use
+`--host` only on a network you trust.
+
+The server (`scripts/serve.mjs`) has no dependencies beyond Node and behaves
+like a static host: correct MIME types, gzip for text assets, long-lived
+caching for the hashed files in `assets/`, and the SPA fallback that makes
+deep links work. To run it behind a reverse proxy on a sub-path, build and
+serve with the same `BASE_PATH`:
+
+```bash
+BASE_PATH=/tool npm run build
+BASE_PATH=/tool npm run serve      # http://localhost:4173/tool/
+```
+
+Alternatively `npm run preview` starts Vite's own preview server — fine for a
+quick look, but it is a development tool and not meant for hosting.
+
 ## Production build
 
 ```bash
 npm run build   # emits static files to dist/
-npm run preview # serve the built dist/ locally to verify
 ```
 
-The build output in `dist/` is fully static and can be served by any web
-server or static host.
+The output in `dist/` is fully static and can also be handed to any existing
+web server (see [Deploying elsewhere](#deploying-elsewhere)).
 
 ## Pages
 
@@ -43,47 +83,20 @@ server or static host.
 | `/aipip`                 | AI Powered Invoice Processing overview                           |
 | `/aipip/simulator`       | AIPIP business case simulator                                    |
 
-## Deploying to GitHub Pages
-
-`.github/workflows/deploy-pages.yml` builds and publishes the site on every
-push to `main`, and can also be started manually from the Actions tab.
-
-One-time setup in the repository: **Settings → Pages → Build and deployment →
-Source: GitHub Actions**. The site is then served at
-`https://<owner>.github.io/<repo>/`. Note that Pages for a *private*
-repository requires a paid GitHub plan; on the free plan the repository has
-to be public.
-
-Two details make a project site work, both already wired up:
-
-- **Sub-path** — a project site lives under `/<repo>/`, not at the domain
-  root. The workflow passes `BASE_PATH` (from `actions/configure-pages`) into
-  the build, which sets Vite's `base`; the router picks the same value up via
-  `import.meta.env.BASE_URL` as its `basename`. With a custom domain
-  `base_path` is empty and the site builds for the root instead — no change
-  needed.
-- **Deep links** — Pages has no rewrite rules, so `npm run build` also writes
-  `dist/404.html` (see `scripts/spa-fallback.mjs`). Pages answers unknown
-  paths like `/demo/benchmarking` with it, and react-router resolves the route
-  client-side. The HTTP status of such a first request is 404 while the page
-  renders normally — that is inherent to the 404.html approach, not a bug.
-
-To reproduce a Pages build locally:
-
-```bash
-BASE_PATH=/Business-Case-Tool npm run build
-npx vite preview --base /Business-Case-Tool/
-```
-
 ## Deploying elsewhere
 
-This is a client-side routed SPA, so the host must serve `index.html` for
-every path — otherwise a direct hit on e.g. `/demo/benchmarking` returns 404.
-`public/_redirects` covers Netlify-style hosts. Equivalents:
+If you serve `dist/` with a web server of your own instead of `npm run serve`,
+remember this is a client-side routed SPA: the host must answer every path
+with `index.html`, otherwise a direct hit on e.g. `/demo/benchmarking` gives a
+404. `public/_redirects` covers Netlify-style hosts. Equivalents:
 
-- **Vercel** — `{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }` in `vercel.json`
 - **nginx** — `try_files $uri $uri/ /index.html;`
 - **Apache** — `FallbackResource /index.html`
+- **Vercel** — `{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }` in `vercel.json`
+- **Hosts with no rewrites** (e.g. GitHub Pages) — `npm run build` also writes
+  `dist/404.html` via `scripts/spa-fallback.mjs`, which such hosts serve for
+  unknown paths so react-router can resolve them. If the site is not at the
+  domain root, build with `BASE_PATH=/<sub-path>`.
 
 ## Project structure
 
@@ -100,6 +113,7 @@ src/
     data/, utils/       mock data, formatting and formula helpers
   imports/              images exported from Figma
 scripts/
+  serve.mjs             dependency-free static server for local hosting
   spa-fallback.mjs      writes dist/404.html after the build
 ```
 
